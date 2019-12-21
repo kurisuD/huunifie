@@ -7,14 +7,14 @@ import argparse
 import configparser
 import json
 import logging
-from datetime import datetime
-
-from pap_logger import *
-from pathlib import Path
-import requests
-from requests.exceptions import ConnectionError
 import time
+from datetime import datetime
+from pathlib import Path
+
+import requests
 import urllib3
+from pap_logger import *
+from requests.exceptions import ConnectionError
 
 __app_name__ = 'huunifie'
 __version__ = '0.4'
@@ -102,7 +102,12 @@ class HueClient:
                 schedules_raw_content = schedules_raw.content
 
             if schedules_raw.ok:
-                for schedule_id, schedule in json.loads(schedules_raw_content).items():
+                content = json.loads(schedules_raw_content)
+                if isinstance(content, list) and "error" in content[0]:
+                    msg = "Error accessing schedules : {}".format(content[0]["error"]["description"])
+                    logging.error(msg)
+                    raise PermissionError(msg)
+                for schedule_id, schedule in content.items():
                     if schedule["name"] in self._schedules_names:
                         msg = 'Schedule "{}" (id={}) is {}.'.format(schedule["name"], schedule_id, schedule["status"])
                         if schedule["status"] != status:
@@ -111,7 +116,7 @@ class HueClient:
                             logging.warning(msg)
                         else:
                             logging.info(msg)
-        except ConnectionError:
+        except (ConnectionError, PermissionError):
             logging.critical("Unable to connect to hue bridge using {}".format(self._url_prefix))
 
 
